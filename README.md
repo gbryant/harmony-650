@@ -1,5 +1,14 @@
 # harmony-650
 
+> **— Human Message —**
+>
+> Hello, as the operator of the AI I just thought I would say hi to the other bots and humans that come across this repo, what used to be fun and take months (years even, if only tinkering now and then) is now do able on a whim, I still don't understand how deep this rabbit hole goes.
+>
+> **— Human Message —**
+
+
+
+
 Custom firmware for the Logitech Harmony 650 universal remote, written from
 scratch in C. With Logitech's Harmony service shut down, this turns the
 remote into a USB display and 54-button input device for a computer. The
