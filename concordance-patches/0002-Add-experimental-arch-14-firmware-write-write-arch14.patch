@@ -1,0 +1,364 @@
+From 3c8593eb7efe9dfbc99250aea406cae3987af655 Mon Sep 17 00:00:00 2001
+From: Gregory Bryant <gregory.r.bryant@gmail.com>
+Date: Mon, 26 Oct 2026 15:18:44 -0700
+Subject: [PATCH 2/4] Add experimental arch 14 firmware write
+ (--write-arch14-fw)
+
+Writes a raw Region 2 image to external flash at 0x0 on Harmony 650/700,
+then verifies it by reading back. The image's size, 0x4847 marker, entry
+goto and header checksum are checked first, and the remote must be in
+application or safe mode. Without --commit only the checks run.
+
+Adds CRemote::EraseSector because EraseFlash never erases the sector at
+flash_base (it starts from the first boundary in the sector table).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01EuLqkrUHyeLdQZcZbCMFB3
+---
+ concordance/concordance.c |  73 ++++++++++++++++++++++++++-
+ libconcord/libconcord.cpp | 103 ++++++++++++++++++++++++++++++++++++++
+ libconcord/libconcord.h   |  14 ++++++
+ libconcord/remote.cpp     |  21 ++++++++
+ libconcord/remote.h       |   1 +
+ 5 files changed, 211 insertions(+), 1 deletion(-)
+
+diff --git a/concordance/concordance.c b/concordance/concordance.c
+index 483beb0..8ab19d2 100644
+--- a/concordance/concordance.c
++++ b/concordance/concordance.c
+@@ -104,6 +104,7 @@ struct options_t {
+     int force;
+     uint32_t flash_addr;
+     uint32_t flash_len;
++    int commit;
+ };
+ 
+ enum {
+@@ -115,6 +116,7 @@ enum {
+     MODE_WRITE_FIRMWARE,
+     MODE_DUMP_SAFEMODE,
+     MODE_DUMP_FLASH,
++    MODE_WRITE_ARCH14_FW,
+     MODE_HELP,
+     MODE_LEARN_IR,
+     MODE_RESET,
+@@ -376,6 +378,8 @@ void parse_options(struct options_t *options, int *mode, char **file_name,
+         {"dump-flash", optional_argument, 0, 0},
+         {"flash-addr", required_argument, 0, 0},
+         {"flash-len", required_argument, 0, 0},
++        {"write-arch14-fw", required_argument, 0, 0},
++        {"commit", no_argument, 0, 0},
+         {"connectivity-test", required_argument, 0, 't'},
+         {"get-time", no_argument, 0, 'k' },
+         {"set-time", no_argument, 0, 'K' },
+@@ -393,6 +397,7 @@ void parse_options(struct options_t *options, int *mode, char **file_name,
+     (*options).noreset = 0;
+     (*options).flash_addr = DEFAULT_FLASH_ADDR;
+     (*options).flash_len = DEFAULT_FLASH_LEN;
++    (*options).commit = 0;
+ 
+     *mode = MODE_UNSET;
+ 
+@@ -422,6 +427,16 @@ void parse_options(struct options_t *options, int *mode, char **file_name,
+                 (*options).flash_len = strtoul(optarg, NULL, 0);
+                 break;
+             }
++            if (!strcmp(long_options[option_index].name,
++                        "write-arch14-fw")) {
++                set_mode(mode, MODE_WRITE_ARCH14_FW);
++                *file_name = optarg;
++                break;
++            }
++            if (!strcmp(long_options[option_index].name, "commit")) {
++                (*options).commit = 1;
++                break;
++            }
+             break;
+         case 'b':
+             (*options).binary = 1;
+@@ -565,6 +580,11 @@ void help()
+     printf("   --dump-flash[=<filename>] [--flash-addr=N] [--flash-len=N]\n");
+     printf("\tRead a raw range of flash (read-only) and write it to a");
+     printf(" file.\n\tDefaults: flash.bin, address 0x0, length 0x30000.\n\n");
++    printf("   --write-arch14-fw=<image.bin> [--commit] [--no-reset]\n");
++    printf("\tEXPERIMENTAL, Harmony 650/700 only. Check a raw firmware");
++    printf(" image and,\n\twith --commit, write it to external flash at");
++    printf(" 0x0, verify it and\n\treset (unless --no-reset). Without --commit");
++    printf(" nothing is written.\n\n");
+     printf("   -t, --connectivity-test <filename>\n");
+     printf("\tDo a connectivity test using <filename>\n\n");
+     printf("   -V, --version\n");
+@@ -852,6 +872,48 @@ int dump_flash(struct options_t *options, char *file_name, lc_callback cb,
+     return 0;
+ }
+ 
++int write_arch14_fw(struct options_t *options, char *file_name,
++                    lc_callback cb, void *cb_arg)
++{
++    FILE *f = fopen(file_name, "rb");
++    if (!f) {
++        return LC_ERROR_OS_FILE;
++    }
++    static uint8_t img[0x20001];
++    size_t size = fread(img, 1, sizeof(img), f);
++    fclose(f);
++    if (size == 0 || size >= sizeof(img)) {
++        fprintf(stderr, "Image must be 1 to 0x20000 bytes\n");
++        return LC_ERROR;
++    }
++
++    int err;
++    printf("Checking %s (0x%zX bytes, header version bytes %02X %02X)\n",
++           file_name, size, size > 7 ? img[6] : 0, size > 7 ? img[7] : 0);
++    if ((err = write_arch14_firmware(img, size, 1, NULL, NULL))) {
++        return err;
++    }
++    printf("Image checks passed.\n");
++
++    if (!options->commit) {
++        printf("Dry run: nothing written. Add --commit to write.\n");
++        return 0;
++    }
++
++    if ((err = write_arch14_firmware(img, size, 0, cb, cb_arg))) {
++        return err;
++    }
++    printf("Firmware written and verified.\n");
++
++    if (!options->noreset) {
++        printf("Resetting...\n");
++        if ((err = reset_remote(cb, cb_arg))) {
++            return err;
++        }
++    }
++    return 0;
++}
++
+ int upload_firmware(struct options_t *options, lc_callback cb, void *cb_arg)
+ {
+     int err;
+@@ -1026,7 +1088,8 @@ int main(int argc, char *argv[])
+       * we have one, so lets read the file.
+       */
+     if (file_name && (mode != MODE_DUMP_CONFIG && mode != MODE_DUMP_FIRMWARE &&
+-        mode != MODE_DUMP_SAFEMODE && mode != MODE_DUMP_FLASH)) {
++        mode != MODE_DUMP_SAFEMODE && mode != MODE_DUMP_FLASH &&
++        mode != MODE_WRITE_ARCH14_FW)) {
+ 
+         int type;
+         if ((err = read_and_parse_file(file_name, &type))) {
+@@ -1190,6 +1253,14 @@ int main(int argc, char *argv[])
+             }
+             break;
+ 
++        case MODE_WRITE_ARCH14_FW:
++            err = write_arch14_fw(&options, file_name,
++                                  cb_print_percent_status, NULL);
++            if (err != 0) {
++                printf("Failed to write firmware: %s\n", lc_strerror(err));
++            }
++            break;
++
+         case MODE_LEARN_IR:
+             err = learn_ir_commands(&options, cb_print_percent_status, NULL);
+             break;
+diff --git a/libconcord/libconcord.cpp b/libconcord/libconcord.cpp
+index c799722..e57610a 100644
+--- a/libconcord/libconcord.cpp
++++ b/libconcord/libconcord.cpp
+@@ -425,6 +425,10 @@ const char *lc_cb_stage_str(int stage)
+             return "Reading flash";
+             break;
+ 
++        case LC_CB_STAGE_VERIFY_FIRMWARE:
++            return "Verifying fw";
++            break;
++
+         case LC_CB_STAGE_RESET:
+             return "Rebooting remote";
+             break;
+@@ -1414,6 +1418,105 @@ int read_flash_range_from_remote(uint32_t addr, uint32_t size, uint8_t **out,
+     return 0;
+ }
+ 
++/* Arch 14 external flash layout: firmware image, then Region 3 at 0x20000 */
++#define ARCH14_FW_ADDR 0x000000
++#define ARCH14_FW_MAX_SIZE 0x020000
++#define ARCH14_SECTOR_SIZE 0x010000
++
++int write_arch14_firmware(const uint8_t *img, uint32_t size, int dry_run,
++                          lc_callback cb, void *cb_arg)
++{
++    if (ri.architecture != 14 || !ri.flash
++        || ri.flash->sectors[0] != ARCH14_SECTOR_SIZE) {
++        debug("Not an arch 14 remote with 64KiB sectors");
++        return LC_ERROR_UNSUPP;
++    }
++    /* Logitech's updater allows application (0) and safe (4) mode only */
++    if (ri.fw_type != 0 && ri.fw_type != 4) {
++        debug("Remote is in firmware type %d", ri.fw_type);
++        return LC_ERROR_UNSUPP;
++    }
++    if (size < 0x10 || size > ARCH14_FW_MAX_SIZE) {
++        debug("Image size 0x%X out of range", size);
++        return LC_ERROR;
++    }
++    /* "HG" marker, then the entry goto (0xEF opcode) at 0x0A */
++    if (img[8] != 0x48 || img[9] != 0x47 || img[0x0B] != 0xEF) {
++        debug("Image header doesn't look like an arch 14 firmware");
++        return LC_ERROR;
++    }
++
++    /*
++     * Pad with 0xFF to a 256-byte boundary. Header bytes 0-1 are an XOR
++     * checksum of the 16-bit words from offset 4 to the end, seeded with
++     * 0x21, 0x43 (see _fix_magic_bytes; arch 14 starts at offset 4).
++     */
++    const uint32_t padded = (size + 0xFF) & ~0xFFu;
++    if (padded > ARCH14_FW_MAX_SIZE) {
++        return LC_ERROR;
++    }
++    uint8_t *buf = new uint8_t[padded + 64];
++    memset(buf, 0xFF, padded + 64);
++    memcpy(buf, img, size);
++
++    uint8_t suma = 0x21, sumb = 0x43;
++    for (uint32_t i = 4; i < padded; i += 2) {
++        suma ^= buf[i];
++        sumb ^= buf[i + 1];
++    }
++    if (suma != buf[0] || sumb != buf[1]) {
++        debug("Header checksum %02X%02X, computed %02X%02X",
++              buf[0], buf[1], suma, sumb);
++        delete[] buf;
++        return LC_ERROR_VERIFY;
++    }
++
++    if (dry_run) {
++        delete[] buf;
++        return 0;
++    }
++
++    CRemote *r = dynamic_cast<CRemote *>(rmt);
++    if (!r) {
++        delete[] buf;
++        return LC_ERROR_UNSUPP;
++    }
++
++    const uint32_t num_sectors =
++        (padded + ARCH14_SECTOR_SIZE - 1) / ARCH14_SECTOR_SIZE;
++    for (uint32_t i = 0; i < num_sectors; i++) {
++        if (cb)
++            cb(LC_CB_STAGE_ERASE_FLASH, i, i, num_sectors,
++               LC_CB_COUNTER_TYPE_STEPS, cb_arg, NULL);
++        if (r->EraseSector(ARCH14_FW_ADDR + i * ARCH14_SECTOR_SIZE)) {
++            delete[] buf;
++            return LC_ERROR_ERASE;
++        }
++    }
++    if (cb)
++        cb(LC_CB_STAGE_ERASE_FLASH, num_sectors, num_sectors, num_sectors,
++           LC_CB_COUNTER_TYPE_STEPS, cb_arg, NULL);
++
++    if (!cb_arg) {
++        cb_arg = (void *)true;
++    }
++
++    if (rmt->WriteFlash(ARCH14_FW_ADDR, padded, buf, ri.protocol, cb, cb_arg,
++                        LC_CB_STAGE_WRITE_FIRMWARE)) {
++        delete[] buf;
++        return LC_ERROR_WRITE;
++    }
++
++    if (rmt->ReadFlash(ARCH14_FW_ADDR, padded, buf, ri.protocol, true, cb,
++                       cb_arg, LC_CB_STAGE_VERIFY_FIRMWARE)) {
++        delete[] buf;
++        return LC_ERROR_VERIFY;
++    }
++
++    delete[] buf;
++    return 0;
++}
++
+ int write_safemode_to_file(uint8_t *in, uint32_t size, char *file_name)
+ {
+     binaryoutfile of;
+diff --git a/libconcord/libconcord.h b/libconcord/libconcord.h
+index f02d147..3fffe80 100644
+--- a/libconcord/libconcord.h
++++ b/libconcord/libconcord.h
+@@ -84,6 +84,7 @@
+ #define LC_CB_STAGE_HTTP 20
+ #define LC_CB_STAGE_LEARN 21
+ #define LC_CB_STAGE_READ_FLASH 22
++#define LC_CB_STAGE_VERIFY_FIRMWARE 23
+ 
+ 
+ /*
+@@ -371,6 +372,19 @@ int read_safemode_from_remote(uint8_t **out, uint32_t *size, lc_callback cb,
+ int read_flash_range_from_remote(uint32_t addr, uint32_t size, uint8_t **out,
+                                  lc_callback cb, void *cb_arg);
+ 
++/*
++ * Arch 14 (Harmony 650/700) only, EXPERIMENTAL: write a raw application
++ * firmware image (as decoded from Region_2.EZUpgrade) to external flash at
++ * 0x000000, then read it back to verify. Does not reset the remote.
++ *
++ * The image is checked first (size, 0x4847 marker, entry goto, header
++ * checksum) and the remote must be in application or safe mode; any
++ * failure returns before anything is erased. With dry_run set, only the
++ * checks are done.
++ */
++int write_arch14_firmware(const uint8_t *img, uint32_t size, int dry_run,
++                          lc_callback cb, void *cb_arg);
++
+ /*
+  * Write aforementioned safemode data to a file. Note that this is always
+  * written as pure binary.
+diff --git a/libconcord/remote.cpp b/libconcord/remote.cpp
+index 7473a43..3563546 100644
+--- a/libconcord/remote.cpp
++++ b/libconcord/remote.cpp
+@@ -547,6 +547,27 @@ int CRemote::ReadRam(uint32_t addr, const uint32_t len, uint8_t *rd)
+     return ReadMiscByte(addr, len, COMMAND_MISC_RAM, rd);
+ }
+ 
++/*
++ * Erase the single sector starting at sector_begin. Unlike EraseFlash this
++ * can erase the sector at flash_base itself (EraseFlash starts at the first
++ * boundary in the sector table, so it never erases the first sector).
++ */
++int CRemote::EraseSector(uint32_t sector_begin)
++{
++    uint8_t erase_cmd[64] = {0};
++    erase_cmd[0] = COMMAND_ERASE_FLASH;
++    erase_cmd[1] = (sector_begin >> 16) & 0xFF;
++    erase_cmd[2] = (sector_begin >> 8) & 0xFF;
++    erase_cmd[3] = sector_begin & 0xFF;
++
++    int err;
++    if ((err = HID_WriteReport(erase_cmd)))
++        return err;
++
++    uint8_t rsp[68];
++    return HID_ReadReport(rsp, 5000);
++}
++
+ int CRemote::WriteFlash(uint32_t addr, const uint32_t len, const uint8_t *wr,
+     unsigned int protocol, lc_callback cb, void *cb_arg, uint32_t cb_stage)
+ {
+diff --git a/libconcord/remote.h b/libconcord/remote.h
+index dc97e2f..1808ab7 100644
+--- a/libconcord/remote.h
++++ b/libconcord/remote.h
+@@ -230,6 +230,7 @@ private:
+ public:
+     CRemote() {};
+     virtual ~CRemote() {};
++    int EraseSector(uint32_t sector_begin);
+     int Reset(uint8_t kind);
+     int GetIdentity(struct TRemoteInfo &ri, struct THIDINFO &hid,
+         lc_callback cb=NULL, void *cb_arg=NULL, uint32_t cb_stage=0);
+-- 
+2.54.0 (Apple Git-157)
+

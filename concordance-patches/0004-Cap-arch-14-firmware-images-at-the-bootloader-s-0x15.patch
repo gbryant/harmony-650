@@ -1,0 +1,29 @@
+From 1c95d09b35925caa41556e213313ebd98ecdce6d Mon Sep 17 00:00:00 2001
+From: Gregory Bryant <gregory.r.bryant@gmail.com>
+Date: Mon, 26 Oct 2026 16:16:03 -0700
+Subject: [PATCH 4/4] Cap arch 14 firmware images at the bootloader's 0x15C00
+ copy limit
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01EuLqkrUHyeLdQZcZbCMFB3
+---
+ libconcord/libconcord.cpp | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/libconcord/libconcord.cpp b/libconcord/libconcord.cpp
+index 5d3807f..7b9f07a 100644
+--- a/libconcord/libconcord.cpp
++++ b/libconcord/libconcord.cpp
+@@ -1420,7 +1420,8 @@ int read_flash_range_from_remote(uint32_t addr, uint32_t size, uint8_t **out,
+ 
+ /* Arch 14 external flash layout: firmware image, then Region 3 at 0x20000 */
+ #define ARCH14_FW_ADDR 0x000000
+-#define ARCH14_FW_MAX_SIZE 0x020000
++/* The bootloader copies at most 0x15C00 bytes (internal 0x9000-0x1EC00) */
++#define ARCH14_FW_MAX_SIZE 0x015C00
+ #define ARCH14_SECTOR_SIZE 0x010000
+ #define ARCH14_FW_HEADER_SIZE 8
+ 
+-- 
+2.54.0 (Apple Git-157)
+

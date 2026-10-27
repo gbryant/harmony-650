@@ -1,0 +1,10 @@
+firmware/build/
+__pycache__/
+.venv/
+*.pyc
+.DS_Store
+# Never commit Logitech files or personal backups
+*.hfw
+*.EZHex
+*.EZUpgrade
+backup/
