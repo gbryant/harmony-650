@@ -69,7 +69,7 @@ Reset → 0x0EFC → init 0xD80 → boot sequence 0x1038, which in order:
 
 What this means for modified firmware:
 - **Bad header/checksum:** the copy still happens, the app check fails, and the remote stays in the bootloader, which can be reflashed over USB with a good image (expected; untested).
-- **Good checksum but broken code:** the app is started. Recovery then depends on the Safe mode key combination at boot (codes 0x06/0x33/0x2C; buttons not yet identified).
+- **Good checksum but broken code:** the app is started. Recovery then depends on the Safe mode key combination at boot: codes 0x06/0x33/0x2C are All Off, OK and Play (identified with the key reporter; only OK tested).
 - Images must be ≤ 0x15C00 bytes (enforced in `--write-arch14-fw`).
 
 ## Wake sources / possible motion sensor (firmware 0.4)

@@ -1,0 +1,946 @@
+{
+  "_about": "Machine-readable summary of the Logitech Harmony 650 hardware and firmware format, from the harmony-650 project (docs/NOTES.md has the full write-up and the evidence). Addresses are hex strings. \"status\" says how each fact is known: \"tested\" = verified on a real remote; \"stock_code\" = read from Logitech firmware 0.4 disassembly, matches behaviour; \"unconfirmed\" = inferred only.",
+  "device": {
+    "model": "Logitech Harmony 650",
+    "architecture": 14,
+    "skin": 72,
+    "mcu": "PIC18F67J50",
+    "cpu_clock_hz": 16000000,
+    "instruction_clock_hz": 4000000,
+    "clock_note": "Bootloader enables the 48 MHz PLL; config CPDIV divides the CPU clock by 3. USB runs at 48 MHz. Measured against USB frames.",
+    "usb": {
+      "stock_app": {
+        "vid": "0x046D",
+        "pid": "0xC122",
+        "product_example": "Harmony Remote 0-0.4.0"
+      },
+      "bootloader_safe_mode": {
+        "vid": "0x046D",
+        "pid": "0xC122",
+        "product": "Harmony Remote 4-0.2.0",
+        "concordance_firmware_type": 4
+      },
+      "custom_firmware": {
+        "vid": "0x1209",
+        "pid": "0x0001",
+        "manufacturer": "harmony-hack",
+        "product": "Harmony 650 Status Monitor"
+      }
+    },
+    "status": "tested"
+  },
+  "memory": {
+    "internal_flash": {
+      "size": "0x20000",
+      "regions": [
+        {
+          "start": "0x00000",
+          "end": "0x08FFF",
+          "contents": "bootloader (never written by this project)"
+        },
+        {
+          "start": "0x09000",
+          "end": "0x1EBFF",
+          "contents": "installed app image, copied from external flash by the bootloader"
+        },
+        {
+          "start": "0x1EC00",
+          "end": "0x1FFF7",
+          "contents": "stock app tables and parameter block"
+        },
+        {
+          "start": "0x1FFF8",
+          "end": "0x1FFFF",
+          "contents": "configuration words",
+          "value": "8e f5 05 fb f8 f8 ff ff"
+        }
+      ]
+    },
+    "external_flash": {
+      "chip": "EON EN25F16",
+      "size": "0x200000",
+      "regions": [
+        {
+          "start": "0x000000",
+          "contents": "app image (the update copied in by the bootloader)"
+        },
+        {
+          "start": "0x020000",
+          "contents": "Region 3 (\"GSPM\")"
+        },
+        {
+          "start": "0x030000",
+          "contents": "user config (\"GSPM\" ... \"PTYY\")"
+        }
+      ]
+    },
+    "concordance_address_space": {
+      "external": {
+        "start": "0x000000",
+        "end": "0x1FFFFF"
+      },
+      "internal_window": {
+        "start": "0xFE0000",
+        "end": "0xFFFFFF",
+        "maps_to_internal": "0x00000",
+        "warning": "writing here overwrites the bootloader; read only"
+      }
+    },
+    "ram": {
+      "update_flag": {
+        "address": "0x100",
+        "install_if": [
+          2,
+          6
+        ],
+        "note": "Logitech RAM[0]; custom firmware must not leave 2 or 6 here"
+      },
+      "usb_ram": {
+        "start": "0x400",
+        "end": "0x7FF"
+      }
+    },
+    "status": "tested"
+  },
+  "app_image": {
+    "load_address": "0x9000",
+    "max_size": "0x15C00",
+    "entry_points": {
+      "reset_goto": "0x900A",
+      "high_isr": "0x9400",
+      "low_isr": "0x9800"
+    },
+    "header": [
+      {
+        "offset": "0x0",
+        "size": 2,
+        "field": "checksum"
+      },
+      {
+        "offset": "0x2",
+        "size": 2,
+        "field": "blank",
+        "value": "FF FF"
+      },
+      {
+        "offset": "0x4",
+        "size": 3,
+        "field": "payload size, little-endian",
+        "value": "image size - 8"
+      },
+      {
+        "offset": "0x7",
+        "size": 1,
+        "field": "version byte"
+      },
+      {
+        "offset": "0x8",
+        "size": 2,
+        "field": "marker",
+        "value": "\"HG\""
+      },
+      {
+        "offset": "0xA",
+        "size": 4,
+        "field": "goto reset entry"
+      }
+    ],
+    "checksum": "a=0x21, b=0x43; for i in range(4, image_size, 2): a ^= img[i]; b ^= img[i+1]; img[0:2] = [a, b]. Image length must be even (pad with 0xFF).",
+    "official_0_4": {
+      "size": "0x12680",
+      "checksum": "CA88",
+      "source": "Region_2.EZUpgrade <DATA> hex text (tools/hfw2bin.py)"
+    },
+    "status": "tested"
+  },
+  "bootloader": {
+    "version": "0.2.0",
+    "sha256_0x0000_0x8FFF": "27a5f27bd3a55d4dcb9999a8042c7e6f536dffe2efcb0cea6d0cc6c05d01132d",
+    "boot_sequence": [
+      "if RAM 0x100 is 2 or 6: copy external 0x0 (size from header + 8, max 0x15C00) to internal 0x9000, no checksum check, clear flag",
+      "if a Safe mode key is held: stay in bootloader",
+      "if the installed app checksum is valid: jump to 0x900A, else stay in bootloader"
+    ],
+    "safe_mode_keys_stock_codes": {
+      "0x06": "All Off",
+      "0x33": "OK",
+      "0x2C": "Play"
+    },
+    "safe_mode_entry_tested": [
+      "hold OK while inserting the battery",
+      "hold OK while plugging in USB with the battery out"
+    ],
+    "status": "stock_code; OK entry tested, All Off/Play unconfirmed"
+  },
+  "update_sequence_logitech": {
+    "steps": [
+      "unless Safe mode (firmware type 4): RestartConfig = A3 0A 09 00",
+      "set RAM[0] = 0 and read back",
+      "invalidate flash (A1 02), erase 64 KiB sectors, write the image at external 0x0, read back and compare",
+      "set RAM[0] = 2 and read back",
+      "reset"
+    ],
+    "implementation": "concordance --write-arch14-fw=<image> [--commit] (concordance-patches/)",
+    "status": "tested"
+  },
+  "keypad": {
+    "columns_driven_low_one_at_a_time": [
+      {
+        "column": 0,
+        "pin": "PORTE0"
+      },
+      {
+        "column": 1,
+        "pin": "PORTE1"
+      },
+      {
+        "column": 2,
+        "pin": "PORTE2"
+      },
+      {
+        "column": 3,
+        "pin": "PORTE3"
+      },
+      {
+        "column": 4,
+        "pin": "PORTE4"
+      },
+      {
+        "column": 5,
+        "pin": "PORTE5"
+      },
+      {
+        "column": 6,
+        "pin": "PORTE6"
+      },
+      {
+        "column": 7,
+        "pin": "PORTA3"
+      },
+      {
+        "column": 8,
+        "pin": "PORTA4"
+      },
+      {
+        "column": 9,
+        "pin": "PORTA5"
+      },
+      {
+        "column": 10,
+        "pin": "PORTD0"
+      },
+      {
+        "column": 11,
+        "pin": "PORTD1"
+      },
+      {
+        "column": 12,
+        "pin": "PORTD2"
+      },
+      {
+        "column": 13,
+        "pin": "PORTD3"
+      }
+    ],
+    "rows_active_low": [
+      {
+        "row": 0,
+        "pin": "PORTB4"
+      },
+      {
+        "row": 1,
+        "pin": "PORTB5"
+      },
+      {
+        "row": 2,
+        "pin": "PORTB6"
+      },
+      {
+        "row": 3,
+        "pin": "PORTB7"
+      }
+    ],
+    "code": "column * 4 + row (0-based)",
+    "stock_code": "code + 1 (stock firmware counts columns and rows from 1)",
+    "unused_codes": [
+      "0x36",
+      "0x37"
+    ],
+    "buttons": [
+      {
+        "code": 0,
+        "stock_code": 1,
+        "column": 0,
+        "row": 0,
+        "name": "Watch a Movie (movie)"
+      },
+      {
+        "code": 1,
+        "stock_code": 2,
+        "column": 0,
+        "row": 1,
+        "name": "Screen: right side, top"
+      },
+      {
+        "code": 2,
+        "stock_code": 3,
+        "column": 0,
+        "row": 2,
+        "name": "Help (help)"
+      },
+      {
+        "code": 3,
+        "stock_code": 4,
+        "column": 0,
+        "row": 3,
+        "name": "More Activities (star)"
+      },
+      {
+        "code": 4,
+        "stock_code": 5,
+        "column": 1,
+        "row": 0,
+        "name": "Watch TV (TV)"
+      },
+      {
+        "code": 5,
+        "stock_code": 6,
+        "column": 1,
+        "row": 1,
+        "name": "All Off (power, safe-mode key)"
+      },
+      {
+        "code": 6,
+        "stock_code": 7,
+        "column": 1,
+        "row": 2,
+        "name": "Listen to Music (music)"
+      },
+      {
+        "code": 7,
+        "stock_code": 8,
+        "column": 1,
+        "row": 3,
+        "name": "Screen: left side, top"
+      },
+      {
+        "code": 8,
+        "stock_code": 9,
+        "column": 2,
+        "row": 0,
+        "name": "Screen: left side, bottom"
+      },
+      {
+        "code": 9,
+        "stock_code": 10,
+        "column": 2,
+        "row": 1,
+        "name": "Menu"
+      },
+      {
+        "code": 10,
+        "stock_code": 11,
+        "column": 2,
+        "row": 2,
+        "name": "Screen: below, left"
+      },
+      {
+        "code": 11,
+        "stock_code": 12,
+        "column": 2,
+        "row": 3,
+        "name": "Exit"
+      },
+      {
+        "code": 12,
+        "stock_code": 13,
+        "column": 3,
+        "row": 0,
+        "name": "Red"
+      },
+      {
+        "code": 13,
+        "stock_code": 14,
+        "column": 3,
+        "row": 1,
+        "name": "Volume up"
+      },
+      {
+        "code": 14,
+        "stock_code": 15,
+        "column": 3,
+        "row": 2,
+        "name": "Volume down"
+      },
+      {
+        "code": 15,
+        "stock_code": 16,
+        "column": 3,
+        "row": 3,
+        "name": "Mute"
+      },
+      {
+        "code": 16,
+        "stock_code": 17,
+        "column": 4,
+        "row": 0,
+        "name": "4"
+      },
+      {
+        "code": 17,
+        "stock_code": 18,
+        "column": 4,
+        "row": 1,
+        "name": "7"
+      },
+      {
+        "code": 18,
+        "stock_code": 19,
+        "column": 4,
+        "row": 2,
+        "name": "+"
+      },
+      {
+        "code": 19,
+        "stock_code": 20,
+        "column": 4,
+        "row": 3,
+        "name": "0"
+      },
+      {
+        "code": 20,
+        "stock_code": 21,
+        "column": 5,
+        "row": 0,
+        "name": "Skip back"
+      },
+      {
+        "code": 21,
+        "stock_code": 22,
+        "column": 5,
+        "row": 1,
+        "name": "Rewind"
+      },
+      {
+        "code": 22,
+        "stock_code": 23,
+        "column": 5,
+        "row": 2,
+        "name": "Record"
+      },
+      {
+        "code": 23,
+        "stock_code": 24,
+        "column": 5,
+        "row": 3,
+        "name": "1"
+      },
+      {
+        "code": 24,
+        "stock_code": 25,
+        "column": 6,
+        "row": 0,
+        "name": "Screen: below, middle"
+      },
+      {
+        "code": 25,
+        "stock_code": 26,
+        "column": 6,
+        "row": 1,
+        "name": "Up (separate from the D-pad)"
+      },
+      {
+        "code": 26,
+        "stock_code": 27,
+        "column": 6,
+        "row": 2,
+        "name": "Down (separate from the D-pad)"
+      },
+      {
+        "code": 27,
+        "stock_code": 28,
+        "column": 6,
+        "row": 3,
+        "name": "Yellow"
+      },
+      {
+        "code": 28,
+        "stock_code": 29,
+        "column": 7,
+        "row": 0,
+        "name": "Blue"
+      },
+      {
+        "code": 29,
+        "stock_code": 30,
+        "column": 7,
+        "row": 1,
+        "name": "Fast forward"
+      },
+      {
+        "code": 30,
+        "stock_code": 31,
+        "column": 7,
+        "row": 2,
+        "name": "Channel up"
+      },
+      {
+        "code": 31,
+        "stock_code": 32,
+        "column": 7,
+        "row": 3,
+        "name": "Channel down"
+      },
+      {
+        "code": 32,
+        "stock_code": 33,
+        "column": 8,
+        "row": 0,
+        "name": "Guide"
+      },
+      {
+        "code": 33,
+        "stock_code": 34,
+        "column": 8,
+        "row": 1,
+        "name": "Screen: right side, bottom"
+      },
+      {
+        "code": 34,
+        "stock_code": 35,
+        "column": 8,
+        "row": 2,
+        "name": "Screen: below, right"
+      },
+      {
+        "code": 35,
+        "stock_code": 36,
+        "column": 8,
+        "row": 3,
+        "name": "Info"
+      },
+      {
+        "code": 36,
+        "stock_code": 37,
+        "column": 9,
+        "row": 0,
+        "name": "6"
+      },
+      {
+        "code": 37,
+        "stock_code": 38,
+        "column": 9,
+        "row": 1,
+        "name": "Skip forward"
+      },
+      {
+        "code": 38,
+        "stock_code": 39,
+        "column": 9,
+        "row": 2,
+        "name": "3"
+      },
+      {
+        "code": 39,
+        "stock_code": 40,
+        "column": 9,
+        "row": 3,
+        "name": "Stop"
+      },
+      {
+        "code": 40,
+        "stock_code": 41,
+        "column": 10,
+        "row": 0,
+        "name": "D-pad right"
+      },
+      {
+        "code": 41,
+        "stock_code": 42,
+        "column": 10,
+        "row": 1,
+        "name": "D-pad down"
+      },
+      {
+        "code": 42,
+        "stock_code": 43,
+        "column": 10,
+        "row": 2,
+        "name": "Back"
+      },
+      {
+        "code": 43,
+        "stock_code": 44,
+        "column": 10,
+        "row": 3,
+        "name": "Play (safe-mode key)"
+      },
+      {
+        "code": 44,
+        "stock_code": 45,
+        "column": 11,
+        "row": 0,
+        "name": "9"
+      },
+      {
+        "code": 45,
+        "stock_code": 46,
+        "column": 11,
+        "row": 1,
+        "name": "Pause"
+      },
+      {
+        "code": 46,
+        "stock_code": 47,
+        "column": 11,
+        "row": 2,
+        "name": "2"
+      },
+      {
+        "code": 47,
+        "stock_code": 48,
+        "column": 11,
+        "row": 3,
+        "name": "5"
+      },
+      {
+        "code": 48,
+        "stock_code": 49,
+        "column": 12,
+        "row": 0,
+        "name": "Green"
+      },
+      {
+        "code": 49,
+        "stock_code": 50,
+        "column": 12,
+        "row": 1,
+        "name": "D-pad up"
+      },
+      {
+        "code": 50,
+        "stock_code": 51,
+        "column": 12,
+        "row": 2,
+        "name": "OK (safe-mode key)"
+      },
+      {
+        "code": 51,
+        "stock_code": 52,
+        "column": 12,
+        "row": 3,
+        "name": "D-pad left"
+      },
+      {
+        "code": 52,
+        "stock_code": 53,
+        "column": 13,
+        "row": 0,
+        "name": "8"
+      },
+      {
+        "code": 53,
+        "stock_code": 54,
+        "column": 13,
+        "row": 1,
+        "name": "E"
+      }
+    ],
+    "status": "tested"
+  },
+  "lcd": {
+    "controller": "Sitronix ST7637 family",
+    "visible": {
+      "width": 128,
+      "height": 128,
+      "origin": [
+        0,
+        0
+      ]
+    },
+    "ram_size": [
+      132,
+      132
+    ],
+    "pixel_format": "RGB565, high byte first",
+    "madctl_0x36": "0x48",
+    "interface": {
+      "type": "4-wire SPI on MSSP2, mode 3 (clock idles high), Fosc/4",
+      "SSP2STAT": "0x00",
+      "SSP2CON1": "0x30",
+      "pins": {
+        "SDA": "RD4 (SDO2; input during ID reads)",
+        "SCL": "RD6 (SCK2)",
+        "CS": "RD7 (active low)",
+        "DC": "RB3 (low = command)",
+        "RESET": "RF6 (active low)"
+      }
+    },
+    "reset": [
+      "RESET low 10 ms",
+      "RESET high",
+      "wait 120 ms"
+    ],
+    "panel_detection": {
+      "method": "bit-banged 3-wire read with MSSP2 off: command, then 8 bits sampled on RD4; each ID read twice",
+      "rule": "ID3 (0xDC) != 0 -> second controller family (stock init at 0xD9C2, 16-bit window addresses with +1/+2 offsets); else ID1 (0xDA) = 1 or 2 -> ST7637 variants 1/2, other -> variant 3",
+      "this_remote": {
+        "ID3": "0x00",
+        "ID1": "0x00",
+        "variant": 3
+      }
+    },
+    "init_sequence_variant_3": [
+      {
+        "cmd": "0x01",
+        "data": []
+      },
+      {
+        "wait_ms": 150
+      },
+      {
+        "cmd": "0xD7",
+        "data": [
+          "0x9F"
+        ]
+      },
+      {
+        "cmd": "0xE0",
+        "data": [
+          "0x00"
+        ]
+      },
+      {
+        "wait_ms": 20
+      },
+      {
+        "cmd": "0xE3",
+        "data": []
+      },
+      {
+        "wait_ms": 20
+      },
+      {
+        "cmd": "0xE1",
+        "data": []
+      },
+      {
+        "cmd": "0x28",
+        "data": []
+      },
+      {
+        "cmd": "0x11",
+        "data": []
+      },
+      {
+        "wait_ms": 50
+      },
+      {
+        "cmd": "0xC0",
+        "data": [
+          "0xF3",
+          "0x00"
+        ]
+      },
+      {
+        "cmd": "0x25",
+        "data": [
+          "0x48"
+        ]
+      },
+      {
+        "cmd": "0xC5",
+        "data": [
+          "0x01"
+        ]
+      },
+      {
+        "cmd": "0xB5",
+        "data": [
+          "0x89"
+        ]
+      },
+      {
+        "cmd": "0xBD",
+        "data": [
+          "0x02"
+        ]
+      },
+      {
+        "cmd": "0xF0",
+        "data": [
+          "0x06",
+          "0x0B",
+          "0x0D",
+          "0x15"
+        ]
+      },
+      {
+        "cmd": "0xF9",
+        "data": [
+          "0x00",
+          "0x03",
+          "0x05",
+          "0x07",
+          "0x09",
+          "0x0B",
+          "0x0D",
+          "0x0F",
+          "0x11",
+          "0x13",
+          "0x15",
+          "0x17",
+          "0x19",
+          "0x1B",
+          "0x1D",
+          "0x1F"
+        ]
+      },
+      {
+        "cmd": "0xC3",
+        "data": [
+          "0x00"
+        ]
+      },
+      {
+        "cmd": "0xC4",
+        "data": [
+          "0x07"
+        ]
+      },
+      {
+        "cmd": "0x20",
+        "data": []
+      },
+      {
+        "cmd": "0xCB",
+        "data": [
+          "0x01"
+        ]
+      },
+      {
+        "cmd": "0x36",
+        "data": [
+          "0x48"
+        ]
+      },
+      {
+        "cmd": "0xD0",
+        "data": [
+          "0x1D"
+        ]
+      },
+      {
+        "cmd": "0x3A",
+        "data": [
+          "0x05"
+        ]
+      },
+      {
+        "cmd": "0xB0",
+        "data": [
+          "0x7F"
+        ]
+      },
+      {
+        "cmd": "0x29",
+        "data": []
+      }
+    ],
+    "draw": [
+      "0x2A x0 x1",
+      "0x2B y0 y1",
+      "0x2C then pixels"
+    ],
+    "status": "tested (variant 3); other variants stock_code only"
+  },
+  "backlights": {
+    "screen": {
+      "pin": "RG4",
+      "on": "high"
+    },
+    "buttons": {
+      "pin": "RG0",
+      "on": "low",
+      "note": "stock firmware dims it with software PWM"
+    },
+    "status": "tested"
+  },
+  "ports_stock_init": {
+    "source": "stock firmware 0x1B3D0, reused by the custom firmware",
+    "sequence": [
+      "ADCON0=0x00",
+      "ADCON1=0x86",
+      "WDTCON|=0x10",
+      "ANCON0=0xF8",
+      "ANCON1=0xFF",
+      "WDTCON&=~0x10",
+      "LATA=0x00 TRISA=0x07",
+      "LATB=0xF6 TRISB=0xF6",
+      "INTCON2|=0x80",
+      "LATC=0x28 TRISC=0x93",
+      "LATD=0xD0 TRISD=0x00",
+      "LATE=0x00 TRISE=0x80",
+      "LATF=0xE0 TRISF=0x04",
+      "LATG=0x09 TRISG=0x00",
+      "LATD=0x00 TRISD=0x00",
+      "LATD|=0x01"
+    ],
+    "status": "tested"
+  },
+  "other_peripherals": {
+    "external_flash_spi": "MSSP1 on PORTC, chip select RF7",
+    "not_yet_understood": [
+      "infrared output (stock uses CCP2/Timer2)",
+      "motion sensor / wake sources (INT1/INT2 suspected)",
+      "battery measurement",
+      "sleep"
+    ],
+    "status": "unconfirmed"
+  },
+  "custom_usb_protocol": {
+    "input_report": {
+      "size": 8,
+      "layout": [
+        "pressed (1/0)",
+        "column",
+        "row",
+        "code",
+        "sequence"
+      ],
+      "info_report": {
+        "byte0": "0x80",
+        "layout": [
+          "0x80",
+          "LCD ID3",
+          "LCD ID1",
+          "Timer0 ticks/ms low",
+          "sequence",
+          "ticks high",
+          "LATG",
+          "display packets processed"
+        ]
+      }
+    },
+    "output_report": {
+      "size": 64,
+      "commands": {
+        "1": "WINDOW x0 y0 x1 y1",
+        "2": "PIXELS n data[n<=62]",
+        "3": "FILL x0 y0 x1 y1 hi lo",
+        "4": "BACKLIGHT flags (bit0 screen, bit1 buttons)",
+        "5": "RUNS n (count hi lo)[n<=20], count 0 = 256",
+        "6": "INFO"
+      }
+    },
+    "throughput": "one 64-byte packet per 1 ms USB frame; ~0.3 s typical full frame, 0.53 s worst case",
+    "status": "tested"
+  },
+  "config_format": {
+    "file": ".EZHex = XML header + binary (<BINARYDATASIZE> bytes, identical to flash at 0x30000)",
+    "binary": "\"GSPM\", 24-bit LE end address at offset 4; at end-2 an XOR-word checksum seeded 0x21,0x43 over [0, end-2); then \"PTYY\"",
+    "file_checksum": "<CHECKSUM> = 0x69 XOR every binary byte",
+    "text": "0x00-terminated strings in a custom character code (partial table in tools/cfgtext.py)",
+    "status": "tested"
+  }
+}

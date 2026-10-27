@@ -181,6 +181,49 @@ speed was tuned. Hardware summary:
 | LCD | ST7637, 128×128 RGB565, SPI on MSSP2 (RD4/RD6/RD7, D/C RB3, reset RF6) |
 | Backlights | screen: RG4 high; buttons: RG0 low |
 
+## Building on this
+This is meant as a starting point. If you want to make something
+user-facing (a better app, Linux/Windows support, a different firmware),
+everything learned so far is written down:
+
+- **[docs/hardware.json](docs/hardware.json)**: the facts in machine-readable
+  form: memory map, image header and checksum, bootloader behaviour, Safe mode
+  keys, all 54 buttons (code, pins, names), LCD pins / SPI settings / init
+  sequence, backlights, the USB protocol, the config format. Each section
+  says whether it was tested on a remote or read from Logitech's code.
+- **[docs/NOTES.md](docs/NOTES.md)**: the same, with the reasoning and
+  evidence (addresses in the stock firmware, test logs).
+
+Where to start, by goal:
+
+| Goal | Start from |
+|---|---|
+| Show your own content on the remote | `tools/harmony.py` (`Remote.show()` takes any Pillow image; `events()` gives button names). No firmware work needed. |
+| Use the buttons as input on a computer | `Remote.events()` or `tools/keyreader.py`; codes in [docs/KEYMAP.md](docs/KEYMAP.md) |
+| Linux / Windows host | hidapi, Pillow and psutil are cross-platform and Concordance builds on both. Two Mac-isms to change: `load_hidapi()` in `tools/keyreader.py` looks for Homebrew's library, then `hidapi` (on Linux it's usually `libhidapi-hidraw`), and `sysmon.py` / `display_test.py` load the macOS Menlo font file. |
+| Change the firmware | `firmware/` (C, SDCC). `build.sh` produces an image the bootloader accepts; `startup.asm` and `harmony650.lkr` keep the header and entry points where the bootloader expects them. |
+| Write your own firmware from scratch | `hardware.json` → `app_image`, `bootloader`, `ports_stock_init`, `keypad`, `lcd` |
+| Edit the stock remote's on-screen text | `tools/cfgtext.py` on a config dumped with Concordance |
+
+Known gaps (good first projects):
+
+- Tested on **one** Harmony 650 (bootloader 0.2.0, LCD ID 0x00/0x00) and
+  macOS only. Other bootloader versions, the other LCD panel variants the
+  stock firmware supports, Linux and Windows hosts, and the Harmony 700
+  (same family in Concordance) are untested.
+- Not implemented: infrared, sleep / battery operation, the motion sensor,
+  standalone use without a computer.
+- Safe mode with **All Off** or **Play** held (the bootloader checks for
+  them too) is untested; **OK** works.
+- The config character table only covers characters seen in one config.
+
+If you try this on another remote, please open an issue with: the model,
+the Safe mode version string (e.g. `Harmony Remote 4-0.2.0`), your
+bootloader's SHA-256 ([docs/BOOTLOADER_DUMP.md](docs/BOOTLOADER_DUMP.md)),
+the LCD IDs (press Help with the firmware running and read the info line
+from `tools/keyreader.py`), your OS, and what worked. Please don't post
+dumps of Logitech's code.
+
 ## License
 GPLv3 (see [LICENSE](LICENSE)). The Concordance patches are GPLv3 like
 Concordance itself.
