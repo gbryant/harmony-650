@@ -41,7 +41,9 @@ Overview · CPU · Network · Colour bars · Spectrum · Buttons · About
 - Builds with free tools (SDCC + gputils) into an image the stock bootloader
   accepts; flashed with a patched [Concordance](https://github.com/jaymzh/concordance).
 - USB: enumerates as a vendor-defined HID device (VID:PID `1209:0001`, the
-  pid.codes test ID), no driver needed.
+  shared [pid.codes](https://pid.codes) test ID, fine for tinkering; a
+  project that grows should request its own free PID there), no driver
+  needed.
 - All 54 buttons report press/release ([docs/KEYMAP.md](docs/KEYMAP.md)).
 - The 128×128 colour LCD (Sitronix ST7637) and both backlights (screen and
   buttons). The computer draws: `tools/harmony.py` renders with Pillow and
@@ -87,7 +89,7 @@ update sequence; dry run unless `--commit`).
     git clone https://github.com/jaymzh/concordance
     cd concordance
     git checkout 041324c5f2d13e486facad78ddb17ad951d7881a
-    git am ../concordance-patches/*.patch
+    git am ../concordance-patches/*.patch     # needs git user.name/email; or: git apply ../concordance-patches/*.patch
     P=$PWD/../build
     export CPPFLAGS="-I$P/include -I/opt/homebrew/include" LDFLAGS="-L$P/lib -L/opt/homebrew/lib"
     (cd libconcord && autoreconf --install && ./configure --prefix=$P && make && make install)

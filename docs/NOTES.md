@@ -76,15 +76,19 @@ What this means for modified firmware:
 - No accelerometer support in Logitech's app for arch 14 (the "accelerator" hardware-feature query, `B3 0C 00 00`, is only sent to arch 12 / Harmony One). No sign of an accelerometer bus in the firmware; the ADC is used in one module only.
 - Low-priority ISR (0x9800): Timer0 → 0x12CBA; PORTB change (RB4–RB7) → 0x18EAE (likely keypad); **INT1 (RB1): flag cleared, no handler** – a pure wake-from-sleep line, enabled at init (0x1B3EC, rising edge); UART RX.
 - Idle routine 0x1A782: arms modules (0x12EB0, 0x1300C, 0x136FE, 0x17038), `sleep`, then polls each module for the wake reason (0x12EBA, 0x1300E, 0x13700, 0x14A94, 0x1703C).
-- **INT2 (RB2) module, 0x12EB0–0x12FA4: a hardware wake input gated by a user setting.** Before sleep it enables INT2 (0x12EB0). After wake, or polled from the main loop (0x12F28 via 0x16096), an INT2 edge triggers a settings lookup (0x12DC0): section 0x0F of the GSPM pointer table (pointer at 4·i+0x0C) must be type 9, and slot 7 must point at a byte equal to 1. If so, event 0x0D/1 is posted (0x10A3E); otherwise 0xF1A = 10 and 0x14A12 run. The setting is 1 in Region 3 (default, 0x021B9E) and in the config (0x08C482). **Hypothesis: the motion/tilt switch with an "enable motion wake" setting.** Test: `mods/config_claude_code_motion_off.EZHex` sets 0x08C482 = 0.
+- **INT2 (RB2) module, 0x12EB0–0x12FA4: a hardware wake input gated by a user setting.** Before sleep it enables INT2 (0x12EB0). After wake, or polled from the main loop (0x12F28 via 0x16096), an INT2 edge triggers a settings lookup (0x12DC0): section 0x0F of the GSPM pointer table (pointer at 4·i+0x0C) must be type 9, and slot 7 must point at a byte equal to 1. If so, event 0x0D/1 is posted (0x10A3E); otherwise 0xF1A = 10 and 0x14A12 run. The setting is 1 in Region 3 (default, 0x021B9E) and in the config (0x08C482). Hypothesis was: the motion/tilt switch with an "enable motion wake" setting. **Tested and ruled out:** with 0x08C482 = 0 the screen still lit when the remote was picked up (see the test log), so what INT2 and this setting do is still open.
 - The ADC routines (0x12E08 sample, 0x12E58 64-sample average) are a separate module, called from 0xCCDA, 0x130FC and 0x13792 – probably battery measurement.
 - Config/Region 3 table reads go through 0x10B72 (TBLPTRU 3 = config at 0x030000, 2 = Region 3 at 0x020000, chosen by flag 0x8E bit 4) and 0x18B70/0x18B94 (read external flash).
 - INT1 (wake-only, no handler) remains unidentified: keypad "any key" line, USB sense, or a second sensor.
 - 0x11700–0x11830 is data, apparently small font bitmaps (false `sleep` hits in the listing).
 
 ## Open questions
-- Which buttons are key codes 0x06, 0x33, 0x2C. (Safe mode entry itself is known, see below.)
+- The motion sensor: which input wakes the remote when it is picked up (INT1/RB1 and INT2/RB2 are candidates; the INT2 config setting is not it).
+- Infrared output (stock firmware uses CCP2 / Timer2), sleep and battery measurement: not yet looked at.
+- The other LCD panel variants (ID1 = 1 or 2, or ID3 ≠ 0): init sequences are in the stock firmware but untested.
+- Safe mode with All Off or Play held: in the bootloader's key list, untested.
 - Exact behaviour of the 0x1F6C0 flag.
+- (Answered: the Safe mode key codes 0x06/0x33/0x2C are All Off, OK and Play.)
 
 ## Concordance changes (branch `dump-flash` in `concordance/`)
 For sharing upstream. All tested only on one Harmony 650 (arch 14, skin 72).
