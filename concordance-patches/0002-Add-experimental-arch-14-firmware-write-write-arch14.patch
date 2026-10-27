@@ -1,7 +1,7 @@
-From 3c8593eb7efe9dfbc99250aea406cae3987af655 Mon Sep 17 00:00:00 2001
+From 6c4cd7be92f639e958e5716c537bcbbd98cdbed2 Mon Sep 17 00:00:00 2001
 From: Gregory Bryant <gregory.r.bryant@gmail.com>
 Date: Mon, 26 Oct 2026 15:18:44 -0700
-Subject: [PATCH 2/4] Add experimental arch 14 firmware write
+Subject: [PATCH 2/5] Add experimental arch 14 firmware write
  (--write-arch14-fw)
 
 Writes a raw Region 2 image to external flash at 0x0 on Harmony 650/700,
@@ -23,7 +23,7 @@ Claude-Session: https://claude.ai/code/session_01EuLqkrUHyeLdQZcZbCMFB3
  5 files changed, 211 insertions(+), 1 deletion(-)
 
 diff --git a/concordance/concordance.c b/concordance/concordance.c
-index 483beb0..8ab19d2 100644
+index 483beb0..35b1e38 100644
 --- a/concordance/concordance.c
 +++ b/concordance/concordance.c
 @@ -104,6 +104,7 @@ struct options_t {
@@ -83,8 +83,8 @@ index 483beb0..8ab19d2 100644
 +    printf("   --write-arch14-fw=<image.bin> [--commit] [--no-reset]\n");
 +    printf("\tEXPERIMENTAL, Harmony 650/700 only. Check a raw firmware");
 +    printf(" image and,\n\twith --commit, write it to external flash at");
-+    printf(" 0x0, verify it and\n\treset (unless --no-reset). Without --commit");
-+    printf(" nothing is written.\n\n");
++    printf(" 0x0, verify it and\n\treset (unless --no-reset). Without");
++    printf(" --commit nothing is written.\n\n");
      printf("   -t, --connectivity-test <filename>\n");
      printf("\tDo a connectivity test using <filename>\n\n");
      printf("   -V, --version\n");

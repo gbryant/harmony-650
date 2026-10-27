@@ -84,7 +84,9 @@ and psutil:
 Upstream Concordance can't write firmware to this remote. The patches in
 [concordance-patches/](concordance-patches/) add `--dump-flash` (read-only
 backup of any flash range) and `--write-arch14-fw` (follows Logitech's own
-update sequence; dry run unless `--commit`).
+update sequence; dry run unless `--commit`). They're also submitted
+upstream as [concordance#99](https://github.com/jaymzh/concordance/pull/99);
+once that's merged, a current Concordance is all you need.
 
     git clone https://github.com/jaymzh/concordance
     cd concordance

@@ -1,7 +1,7 @@
-From 1c95d09b35925caa41556e213313ebd98ecdce6d Mon Sep 17 00:00:00 2001
+From b85195e1b24ff602b587531327c1ca71bd5321fd Mon Sep 17 00:00:00 2001
 From: Gregory Bryant <gregory.r.bryant@gmail.com>
 Date: Mon, 26 Oct 2026 16:16:03 -0700
-Subject: [PATCH 4/4] Cap arch 14 firmware images at the bootloader's 0x15C00
+Subject: [PATCH 4/5] Cap arch 14 firmware images at the bootloader's 0x15C00
  copy limit
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>

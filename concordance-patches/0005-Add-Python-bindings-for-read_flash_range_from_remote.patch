@@ -1,0 +1,63 @@
+From 47a73e714952f14131192ece80c62f50cca4028d Mon Sep 17 00:00:00 2001
+From: Gregory Bryant <gregory.r.bryant@gmail.com>
+Date: Mon, 26 Oct 2026 22:23:14 -0700
+Subject: [PATCH 5/5] Add Python bindings for read_flash_range_from_remote and
+ write_arch14_firmware
+
+Also expose the two callback stages they report, LC_CB_STAGE_READ_FLASH
+and LC_CB_STAGE_VERIFY_FIRMWARE. The Perl bindings pick both functions up
+from libconcord.h through the existing uint8_t* / uint8_t** typemaps.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01EuLqkrUHyeLdQZcZbCMFB3
+---
+ libconcord/bindings/python/libconcord.py | 26 ++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
+
+diff --git a/libconcord/bindings/python/libconcord.py b/libconcord/bindings/python/libconcord.py
+index e54644e..a0aaeb8 100644
+--- a/libconcord/bindings/python/libconcord.py
++++ b/libconcord/bindings/python/libconcord.py
+@@ -94,6 +94,8 @@ LC_CB_STAGE_RESET = 18
+ LC_CB_STAGE_SET_TIME = 19
+ LC_CB_STAGE_HTTP = 20
+ LC_CB_STAGE_LEARN = 21
++LC_CB_STAGE_READ_FLASH = 22
++LC_CB_STAGE_VERIFY_FIRMWARE = 23
+ 
+ # Public libconcord API: Exception types
+ 
+@@ -827,6 +829,30 @@ write_firmware_to_file = _create_func(
+     _in('binary', c_int)
+ )
+ 
++# int read_flash_range_from_remote(uint32_t addr, uint32_t size, uint8_t **out,
++#     lc_callback cb, void *cb_arg);
++read_flash_range_from_remote = _create_func(
++    'read_flash_range_from_remote',
++    _ret_lc_concord(),
++    _in('addr', c_uint),
++    _in('size', c_uint),
++    _out('out', POINTER(c_ubyte)),
++    _in('cb', callback_type),
++    _in('cb_arg', py_object)
++)
++
++# int write_arch14_firmware(const uint8_t *img, uint32_t size, int dry_run,
++#     lc_callback cb, void *cb_arg);
++write_arch14_firmware = _create_func(
++    'write_arch14_firmware',
++    _ret_lc_concord(),
++    _in('img', POINTER(c_ubyte)),
++    _in('size', c_uint),
++    _in('dry_run', c_int),
++    _in('cb', callback_type),
++    _in('cb_arg', py_object)
++)
++
+ # int get_key_names(char ***key_names, uint32_t *key_names_length);
+ get_key_names = _create_func(
+     'get_key_names',
+-- 
+2.54.0 (Apple Git-157)
+

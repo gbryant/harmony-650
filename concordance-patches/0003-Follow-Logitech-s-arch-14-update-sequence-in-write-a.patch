@@ -1,7 +1,7 @@
-From e1928c73ec2bde5e59009c290662717afc8b3c56 Mon Sep 17 00:00:00 2001
+From b039940ded0a041d2175eb4fdd8dd058fdb93610 Mon Sep 17 00:00:00 2001
 From: Gregory Bryant <gregory.r.bryant@gmail.com>
 Date: Mon, 26 Oct 2026 15:24:25 -0700
-Subject: [PATCH 3/4] Follow Logitech's arch 14 update sequence in
+Subject: [PATCH 3/5] Follow Logitech's arch 14 update sequence in
  --write-arch14-fw
 
 Taken from the Windows Harmony Remote 7.7.0 updater
@@ -24,7 +24,7 @@ Claude-Session: https://claude.ai/code/session_01EuLqkrUHyeLdQZcZbCMFB3
  5 files changed, 79 insertions(+), 41 deletions(-)
 
 diff --git a/concordance/concordance.c b/concordance/concordance.c
-index 8ab19d2..9180e48 100644
+index 35b1e38..a051f27 100644
 --- a/concordance/concordance.c
 +++ b/concordance/concordance.c
 @@ -888,8 +888,8 @@ int write_arch14_fw(struct options_t *options, char *file_name,

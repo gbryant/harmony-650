@@ -1,7 +1,7 @@
 From 5ddb86854831351fb6f12318a17617ee434daab4 Mon Sep 17 00:00:00 2001
 From: Gregory Bryant <gregory.r.bryant@gmail.com>
 Date: Mon, 26 Oct 2026 14:45:50 -0700
-Subject: [PATCH 1/4] Add read-only --dump-flash for raw flash range backups
+Subject: [PATCH 1/5] Add read-only --dump-flash for raw flash range backups
 
 Lets arch 14 (Harmony 650/700) owners back up the full firmware region,
 which --dump-firmware/--dump-safemode can't reach (64KB from 0x0 only).
