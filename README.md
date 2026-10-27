@@ -2,7 +2,7 @@
 
 > **— Human Message —**
 >
-> Hello, as the operator of the AI I just thought I would say hi to the other bots and humans that come across this repo, what used to be fun and take months (years even, if only tinkering now and then) is now do able on a whim, I still don't understand how deep this rabbit hole goes.
+> Hello, as the operator of the AI I just thought I would say hi to the other bots and humans that come across this repo, what used to be fun and take months (years even, if only tinkering now and then) is now possible on a whim, I still don't understand how deep this rabbit hole goes.
 >
 > **— Human Message —**
 
