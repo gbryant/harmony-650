@@ -3,10 +3,13 @@
 
     .venv/bin/python tools/sysmon.py
 
-D-pad left/right: change page.  All Off: LCD backlight.  Red: button
-backlight.  Exit: quit.
+D-pad left/right: change page (overview, CPU, network, colour bars,
+spectrum, buttons, about).  All Off: LCD backlight.  Red: button
+backlight.  Stop it with Ctrl-C (no remote button quits, so it can't be
+stopped by accident).
 """
 import collections
+import colorsys
 import os
 import sys
 import time
@@ -42,7 +45,7 @@ def graph(d, top, bottom, series, color, peak=None):
         d.line(pts, fill=color)
 
 
-def page_overview(d, s):
+def page_overview(img, d, s, hist, ui):
     d.text((2, 0), time.strftime('%H:%M:%S'), font=BIG, fill=FG)
     d.text((86, 4), time.strftime('%a'), font=FONT, fill=DIM)
     y = 22
@@ -66,7 +69,7 @@ def page_overview(d, s):
     d.text((2, 116), 'up ' + s['uptime'], font=FONT, fill=DIM)
 
 
-def page_cpu(d, s, hist):
+def page_cpu(img, d, s, hist, ui):
     d.text((2, 0), 'CPU %d%%' % s['cpu'], font=BIG, fill=CPU_C)
     d.rectangle((1, 22, 126, 70), outline=(50, 50, 50))
     graph(d, 23, 69, list(hist['cpu']), CPU_C, peak=100)
@@ -79,7 +82,7 @@ def page_cpu(d, s, hist):
     d.text((2, 74), '%d cores' % n, font=FONT, fill=DIM)
 
 
-def page_net(d, s, hist):
+def page_net(img, d, s, hist, ui):
     d.text((2, 0), 'Network', font=BIG, fill=FG)
     peak = max(max(hist['up'], default=0), max(hist['down'], default=0), 1024)
     d.rectangle((1, 22, 126, 100), outline=(50, 50, 50))
@@ -90,7 +93,60 @@ def page_net(d, s, hist):
     d.text((2, 116), 'peak ' + human_rate(peak) + '/s', font=FONT, fill=DIM)
 
 
-PAGES = [page_overview, page_cpu, page_net]
+def page_colors(img, d, s, hist, ui):
+    """SMPTE-style bars, a grey ramp and RGB ramps: a test card for photos."""
+    bars = [(192, 192, 192), (192, 192, 0), (0, 192, 192), (0, 192, 0),
+            (192, 0, 192), (192, 0, 0), (0, 0, 192)]
+    for i, c in enumerate(bars):
+        d.rectangle((i * 128 // 7, 0, (i + 1) * 128 // 7 - 1, 69), fill=c)
+    for i, c in enumerate([(0, 0, 192), (0, 0, 0), (192, 0, 192), (0, 0, 0),
+                           (0, 192, 192), (0, 0, 0), (192, 192, 192)]):
+        d.rectangle((i * 128 // 7, 70, (i + 1) * 128 // 7 - 1, 79), fill=c)
+    for x in range(128):
+        v = x * 255 // 127
+        d.line((x, 80, x, 93), fill=(v, v, v))
+        d.line((x, 94, x, 103), fill=(v, 0, 0))
+        d.line((x, 104, x, 113), fill=(0, v, 0))
+        d.line((x, 114, x, 127), fill=(0, 0, v))
+
+
+def page_spectrum(img, d, s, hist, ui):
+    """Hue across, brightness down: shows the panel's full colour range."""
+    px = img.load()
+    for y in range(128):
+        for x in range(128):
+            r, g, b = colorsys.hsv_to_rgb(x / 128.0, 1.0 if y < 64 else 1.0 - (y - 64) / 64.0,
+                                          y / 64.0 if y < 64 else 1.0)
+            px[x, y] = (int(r * 255), int(g * 255), int(b * 255))
+
+
+def page_buttons(img, d, s, hist, ui):
+    """Shows the last button pressed, to demo the input side."""
+    d.text((2, 0), 'Buttons', font=BIG, fill=FG)
+    d.text((2, 22), 'press any button', font=FONT, fill=DIM)
+    name = ui.get('last_button')
+    if name:
+        label = name.replace('_', ' ')
+        font = BIG if d.textlength(label, font=BIG) <= 108 else FONT
+        w = d.textlength(label, font=font)
+        d.rounded_rectangle((4, 50, 123, 86), radius=8, outline=CPU_C, width=2)
+        d.text(((128 - w) / 2, 60 if font is BIG else 63), label, font=font, fill=FG)
+        d.text((2, 100), '%d presses' % ui.get('presses', 0), font=FONT, fill=DIM)
+    d.text((2, 116), '54 buttons, USB HID', font=FONT, fill=DIM)
+
+
+def page_about(img, d, s, hist, ui):
+    for i, c in enumerate([(255, 80, 80), (255, 200, 80), (120, 255, 120), (80, 200, 255)]):
+        d.ellipse((6 + i * 14, 6, 18 + i * 14, 18), fill=c)
+    d.text((2, 26), 'Harmony 650', font=BIG, fill=FG)
+    d.text((2, 46), 'Status Monitor', font=FONT, fill=CPU_C)
+    lines = ['custom firmware in C', 'PIC18F67J50 @ 16 MHz', '128x128 ST7637 LCD',
+             'drawn over USB HID', 'github: harmony-650']
+    for i, line in enumerate(lines):
+        d.text((2, 66 + i * 12), line, font=FONT, fill=DIM if i < 4 else FG)
+
+
+PAGES = [page_overview, page_cpu, page_net, page_colors, page_spectrum, page_buttons, page_about]
 
 
 def reconnect(r, lcd, keys):
@@ -114,8 +170,10 @@ def send(r, action, lcd, keys):
 
 def main():
     r = Remote()
+    print('sysmon started', time.strftime('%Y-%m-%d %H:%M:%S'), flush=True)
     r.backlight(lcd=True, keys=False)
     page, lcd, keys = 0, True, False
+    ui = {'last_button': None, 'presses': 0}
     hist = {k: collections.deque(maxlen=HISTORY) for k in ('cpu', 'up', 'down')}
     psutil.cpu_percent(percpu=True)
     net = psutil.net_io_counters()
@@ -155,6 +213,8 @@ def main():
         for name, pressed in events:
             if not pressed:
                 continue
+            ui['last_button'] = name
+            ui['presses'] += 1
             if name == 'dpad_right':
                 page = (page + 1) % len(PAGES)
             elif name == 'dpad_left':
@@ -165,22 +225,17 @@ def main():
             elif name == 'red':
                 keys = not keys
                 send(r, lambda: r.backlight(lcd, keys), lcd, keys)
-            elif name == 'exit':
-                r.close()
-                return
             dirty = True
 
         if dirty and s:
             img = Image.new('RGB', (W, H), BG)
             d = ImageDraw.Draw(img)
-            fn = PAGES[page]
-            if fn is page_overview:
-                fn(d, s)
-            else:
-                fn(d, s, hist)
-            # page dots
-            for i in range(len(PAGES)):
-                d.ellipse((112 + i * 5, 118, 114 + i * 5, 120), fill=FG if i == page else (60, 60, 60))
+            PAGES[page](img, d, s, hist, ui)
+            # page dots, except on the full-screen test pages
+            if PAGES[page] not in (page_colors, page_spectrum):
+                x0 = 126 - len(PAGES) * 5
+                for i in range(len(PAGES)):
+                    d.ellipse((x0 + i * 5, 118, x0 + i * 5 + 2, 120), fill=FG if i == page else (60, 60, 60))
             send(r, lambda: r.show(img), lcd, keys)
         time.sleep(0.02)
 
@@ -190,3 +245,5 @@ if __name__ == '__main__':
         main()
     except KeyboardInterrupt:
         pass
+    finally:
+        print('sysmon stopped', time.strftime('%Y-%m-%d %H:%M:%S'), flush=True)

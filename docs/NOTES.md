@@ -39,6 +39,7 @@ Not included (Logitech's copyrighted files, or personal data), referred to below
 Checksum: a=0x21, b=0x43; for i from 4 to end of image (exact length, no padding) step 2: a^=img[i], b^=img[i+1]. Same as Logitech `getValidFirmware` (word XOR, seed 0x4321). Verified on 0.3 and 0.4.
 
 ## Internal (PIC) memory
+- Step-by-step dump and check of your own bootloader: [BOOTLOADER_DUMP.md](BOOTLOADER_DUMP.md). Bootloader 0.2.0 (internal 0x0000–0x8FFF) SHA-256 `27a5f27bd3a55d4dcb9999a8042c7e6f536dffe2efcb0cea6d0cc6c05d01132d`.
 - Readable through Concordance's flash read at 0xFE0000–0xFFFFFF (internal 0x00000–0x1FFFF); Logitech's flash map has 128 × 1 KiB blocks there.
 - Bootloader at 0x0000–~0x7000. Its vectors: 0x0008 → `goto 0x9400`, 0x0018 → `goto 0x9800`.
 - Internal 0x9000.. holds an exact copy of the external image (header included): the bootloader copies external → internal.
@@ -128,7 +129,7 @@ For sharing upstream. All tested only on one Harmony 650 (arch 14, skin 72).
   - `harmony650.lkr`: code only in 0x9000–0x1EBFF; header, 0x9400 and 0x9800 vectors reserved; RAM bank 0x100 (bootloader update flag) and USB RAM 0x400–0x7FF kept out of the allocator.
   - `startup.asm`: image header (filled in by `tools/fixhdr.py`), `goto` at 0x900A, return-only vectors, stack setup; `tools/hex2img.py` turns the linker's HEX into the image and refuses anything outside the app area.
   - `main.c` (stock port init from 0x1B3D0), `keypad.c` (matrix scan, 4-scan debounce), `usb.c` + `usb_desc.c` (polled USB, EP0 control + EP1 interrupt IN, BDT at 0x400 without ping-pong), `hw.h`/`regs.c` (registers by address, no device headers).
-- Enumerates as vendor-defined HID (usage page 0xFF00), VID:PID 1209:0001 (pid.codes test), "harmony-hack" / "Harmony 650 Key Reporter". 8-byte input report: pressed, column, row, code (column·4+row), sequence number.
+- Enumerates as vendor-defined HID (usage page 0xFF00), VID:PID 1209:0001 (pid.codes test), "harmony-hack" / "Harmony 650 Key Reporter" (renamed "Harmony 650 Status Monitor" for the first release). 8-byte input report: pressed, column, row, code (column·4+row), sequence number.
 - `tools/keyreader.py [--log FILE]` (hidapi via ctypes) prints events; no macOS Input Monitoring permission needed.
 - No screen, IR or sleep: the firmware only reports buttons, so it runs the battery down; recover with Safe mode (OK) + `hfw/region2.bin`.
 - SDCC notes: no crt0 is linked (`--no-crt`), so globals are initialized in code; struct assignment needs `memcpy` and generic pointers need library helpers, so use field copies and `__data`/`__code` pointers.
@@ -149,7 +150,7 @@ For sharing upstream. All tested only on one Harmony 650 (arch 14, skin 72).
 - USB: same vendor HID (1209:0001) plus **EP1 OUT**, 64-byte output reports (interval 1 ms). Byte 0 = command: `1` WINDOW x0 y0 x1 y1 (2A/2B/2C), `2` PIXELS n + n ≤ 62 bytes RGB565 high byte first, `3` FILL x0 y0 x1 y1 hi lo, `4` BACKLIGHT (bit 0 LCD, bit 1 buttons). Input reports unchanged (button events; 0x80 = info: LCD IDs, ticks/ms, LATG).
 - **Visible area is 128×128 at (0,0)** with MADCTL 0x48: a border at 0..127 shows on all sides, nothing of RAM 128..131 is visible, text is upright and not mirrored.
 - No open-source ST7637 driver exists; the ST7735 shares the drawing commands (2A/2B/2C/36/3A) and libraries like luma.lcd target it, but porting a graphics library to the PIC isn't worth it. Drawing is done on the Mac with Pillow instead; the remote is a framebuffer.
-- Mac side (Pillow + psutil in `.venv/`): `tools/harmony.py` (Remote: `show()` sends only the changed bounding box, `fill()`, `backlight()`, `events()` with button names from KEYMAP.md), `tools/display_test.py`, `tools/sysmon.py` (overview / CPU graph + per-core bars / network graph; D-pad ◀▶ pages, All Off = LCD backlight, Red = button backlight, Exit = quit).
+- Mac side (Pillow + psutil in `.venv/`): `tools/harmony.py` (Remote: `show()` sends only the changed bounding box, `fill()`, `backlight()`, `events()` with button names from KEYMAP.md), `tools/display_test.py`, `tools/sysmon.py` (7 pages: overview / CPU graph + per-core bars / network graph / colour bars / spectrum / last button pressed / about; D-pad ◀▶ pages, All Off = LCD backlight on/off, Red = button backlight on/off; no button quits, Ctrl-C stops it).
 - Full-frame redraw measured 1.65 s (32 KB in ~530 packets); the monitor mostly sends small regions (the clock) each second.
 - macOS: `psutil.disk_usage('/')` is the sealed system volume (2%); use `/System/Volumes/Data`.
 - **2026-10-26:** flashed from safe mode; test pattern correct, `sysmon.py` running on the remote.

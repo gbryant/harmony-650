@@ -61,9 +61,10 @@ static __code const unsigned char string1[] = {
 };
 
 static __code const unsigned char string2[] = {
-    2 + 2 * 24, 0x03,
+    2 + 2 * 26, 0x03,
     'H',0, 'a',0, 'r',0, 'm',0, 'o',0, 'n',0, 'y',0, ' ',0, '6',0, '5',0, '0',0, ' ',0,
-    'K',0, 'e',0, 'y',0, ' ',0, 'R',0, 'e',0, 'p',0, 'o',0, 'r',0, 't',0, 'e',0, 'r',0,
+    'S',0, 't',0, 'a',0, 't',0, 'u',0, 's',0, ' ',0, 'M',0, 'o',0, 'n',0, 'i',0, 't',0,
+    'o',0, 'r',0,
 };
 
 unsigned char usb_descriptor(unsigned char type, unsigned char index,

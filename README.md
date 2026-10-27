@@ -9,6 +9,25 @@ remote's colour screen, with the remote's buttons switching pages.
 **Status: proof of concept.** Tested on one Harmony 650 (firmware 0.3/0.4,
 bootloader 0.2.0) with a Mac. Not affiliated with or endorsed by Logitech.
 
+<p align="center">
+<img src="docs/images/hero.jpg" width="420" alt="Harmony 650 running the custom firmware, showing the About page">
+</p>
+
+## Pages
+The system monitor demo, stepped through with the D-pad:
+
+<p>
+<img src="docs/images/page-overview.jpg" width="130" alt="Overview: clock, CPU, memory, disk, network, load, uptime">
+<img src="docs/images/page-cpu.jpg" width="130" alt="CPU history graph and per-core bars">
+<img src="docs/images/page-network.jpg" width="130" alt="Network history graph">
+<img src="docs/images/page-colors.jpg" width="130" alt="Colour bars test card">
+<img src="docs/images/page-spectrum.jpg" width="130" alt="Hue and brightness spectrum">
+<img src="docs/images/page-buttons.jpg" width="130" alt="Last button pressed">
+<img src="docs/images/page-about.jpg" width="130" alt="About page">
+</p>
+
+Overview · CPU · Network · Colour bars · Spectrum · Buttons · About
+
 ## What works
 - Builds with free tools (SDCC + gputils) into an image the stock bootloader
   accepts; flashed with a patched [Concordance](https://github.com/jaymzh/concordance).
@@ -68,12 +87,19 @@ update sequence; dry run unless `--commit`).
 The binary is `build/bin/concordance`.
 
 ## 2. Back up the remote
+Do this while the remote still runs Logitech's firmware.
+[docs/BOOTLOADER_DUMP.md](docs/BOOTLOADER_DUMP.md) explains each step,
+how to check your bootloader against a known-good hash, and what can and
+can't be restored.
 
     concordance --dump-config config.EZHex
     concordance --dump-flash=extflash.bin --flash-addr=0 --flash-len=0x200000
     concordance --dump-flash=internal.bin --flash-addr=0xFE0000 --flash-len=0x20000
 
 ## 3. Build and flash the firmware
+To try it without installing SDCC, download `fw.bin` from the
+[latest release](../../releases/latest) and use it in place of
+`firmware/build/fw.bin` below.
 
     firmware/build.sh                                       # -> firmware/build/fw.bin
     concordance --write-arch14-fw=firmware/build/fw.bin     # dry run: checks only
@@ -81,7 +107,7 @@ The binary is `build/bin/concordance`.
 
 After the reset Concordance keeps waiting for the stock firmware to come
 back ("Rebooting remote"); press Ctrl-C. The remote now shows a dark blue
-screen and appears as "Harmony 650 Key Reporter". To flash again later,
+screen and appears as "Harmony 650 Status Monitor". To flash again later,
 enter Safe mode first.
 
 ## 4. Use it
@@ -91,9 +117,16 @@ enter Safe mode first.
     .venv/bin/python tools/keyreader.py     # print raw button events
     .venv/bin/python tools/packet_test.py   # check no display packets are lost
 
-In the monitor: D-pad ◀ ▶ change pages, All Off toggles the screen
-backlight, Red toggles the button backlight, Exit quits. It reconnects by
-itself if the remote is unplugged.
+Monitor controls:
+
+| Button | Action |
+|---|---|
+| D-pad ◀ ▶ | Change page: overview, CPU, network, colour bars, spectrum, buttons, about |
+| All Off (power) | Screen backlight on/off (the display keeps running) |
+| Red | Button backlight on/off |
+
+No remote button quits the monitor (so it can't stop by accident); stop it
+with Ctrl-C. It reconnects by itself if the remote is unplugged.
 
 From your own code:
 
